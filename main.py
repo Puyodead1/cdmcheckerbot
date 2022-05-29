@@ -3,8 +3,10 @@ from typing import Optional
 import discord
 from discord import app_commands
 from treelib import Tree
-
+from dotenv import load_dotenv
 from pywidevine.cdm.formats import wv_proto2_pb2
+
+load_dotenv()
 
 GUILD = discord.Object(id=os.environ["GUILD_ID"])
 TOKEN = os.environ["TOKEN"]
