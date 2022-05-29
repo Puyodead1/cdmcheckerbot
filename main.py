@@ -2,11 +2,12 @@ import base64
 import json
 import os
 from typing import Optional
+
 import discord
-from discord import app_commands
 import requests
-from treelib import Tree
+from discord import app_commands
 from dotenv import load_dotenv
+from treelib import Tree
 
 from pywidevine.cdm.formats import wv_proto2_pb2
 from pywidevine.decrypt.wvdecryptcustom import WvDecrypt

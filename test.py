@@ -1,7 +1,9 @@
 import base64
 import json
 from pprint import pprint
+
 import requests
+
 from pywidevine.decrypt.wvdecryptcustom import WvDecrypt
 
 url = "https://lic.staging.drmtoday.com/license-proxy-widevine/cenc/?assetId=agent-327"
