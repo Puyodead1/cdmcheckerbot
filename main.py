@@ -30,9 +30,9 @@ class Client(discord.Client):
     # Instead of specifying a guild to every command, we copy over our global commands instead.
     # By doing so we don't have to wait up to an hour until they are shown to the end-user.
     async def setup_hook(self):
-        # This copies the global commands over to your guild.
-        self.tree.copy_global_to(guild=GUILD)
-        await self.tree.sync(guild=GUILD)
+        # # This copies the global commands over to your guild.
+        # self.tree.copy_global_to(guild=GUILD)
+        await self.tree.sync()
 
 
 intents = discord.Intents.default()
