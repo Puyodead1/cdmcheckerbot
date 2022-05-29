@@ -1,7 +1,7 @@
 import os
 from typing import Optional
 import discord
-from discord import Attachment, app_commands
+from discord import app_commands
 from treelib import Tree
 
 from pywidevine.cdm.formats import wv_proto2_pb2
