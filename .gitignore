@@ -1,0 +1,4 @@
+__pycache__/
+.env
+pywidevine/cdm/devices/*
+!pywidevine/cdm/devices/.gitkeep
