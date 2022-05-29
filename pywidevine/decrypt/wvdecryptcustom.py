@@ -12,10 +12,11 @@ class WvDecrypt(object):
     WV_SYSTEM_ID = [
         237, 239, 139, 169, 121, 214, 74, 206, 163, 200, 39, 220, 213, 29, 33, 237]
 
-    def __init__(self, init_data_b64, cert_data_b64, device, cdm=None):
+    def __init__(self, init_data_b64: str, cert_data_b64, device_client_id: bytes, device_private_key, cdm: Cdm = None):
         self.init_data_b64 = init_data_b64
         self.cert_data_b64 = cert_data_b64
-        self.device = device
+        self.device_client_id = device_client_id
+        self.device_private_key = device_private_key
         if cdm != None:
             self.cdm = cdm
         else:
@@ -37,7 +38,7 @@ class WvDecrypt(object):
                 return pssh_b64
 
         self.session = self.cdm.open_session(check_pssh(
-            self.init_data_b64), deviceconfig.DeviceConfig(self.device))
+            self.init_data_b64), self.device_client_id, self.device_private_key)
         if self.cert_data_b64:
             self.cdm.set_service_certificate(self.session, self.cert_data_b64)
 

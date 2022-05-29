@@ -1,10 +1,10 @@
 class Session:
-    def __init__(self, session_id, init_data, device_config, offline):
+    def __init__(self, session_id, init_data, device_client_id: bytes, device_private_key: bytes, offline):
         self.session_id = session_id
         self.init_data = init_data
         self.offline = offline
-        self.device_config = device_config
-        self.device_key = None
+        self.device_client_id = device_client_id
+        self.device_key = device_private_key
         self.session_key = None
         self.derived_keys = {
             'enc': None,

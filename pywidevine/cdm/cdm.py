@@ -25,25 +25,32 @@ class Cdm:
         self.logger = logging.getLogger(__name__)
         self.sessions = {}
 
-    def open_session(self, init_data_b64, device, raw_init_data=None, offline=False):
-        self.logger.debug(
-            "open_session(init_data_b64={}, device={}".format(init_data_b64, device))
+    def open_session(self, init_data_b64: str, device_client_id: bytes, device_private_key: bytes, raw_init_data=None, offline=False):
+        # self.logger.debug(
+        #     "open_session(init_data_b64={}, device={}".format(init_data_b64, device))
         self.logger.info("opening new cdm session")
-        if device.session_id_type == 'android':
-            # format: 16 random hexdigits, 2 digit counter, 14 0s
-            rand_ascii = ''.join(random.choice('ABCDEF0123456789')
-                                 for _ in range(16))
-            counter = '01'  # this resets regularly so its fine to use 01
-            rest = '00000000000000'
-            session_id = rand_ascii + counter + rest
-            session_id = session_id.encode('ascii')
-        elif device.session_id_type == 'chrome':
-            rand_bytes = get_random_bytes(16)
-            session_id = rand_bytes
-        else:
-            # other formats NYI
-            self.logger.error("device type is unusable")
-            return 1
+        # if device.session_id_type == 'android':
+        #     # format: 16 random hexdigits, 2 digit counter, 14 0s
+        #     rand_ascii = ''.join(random.choice('ABCDEF0123456789')
+        #                          for _ in range(16))
+        #     counter = '01'  # this resets regularly so its fine to use 01
+        #     rest = '00000000000000'
+        #     session_id = rand_ascii + counter + rest
+        #     session_id = session_id.encode('ascii')
+        # elif device.session_id_type == 'chrome':
+        #     rand_bytes = get_random_bytes(16)
+        #     session_id = rand_bytes
+        # else:
+        #     # other formats NYI
+        #     self.logger.error("device type is unusable")
+        #     return 1
+        rand_ascii = ''.join(random.choice('ABCDEF0123456789')
+                             for _ in range(16))
+        counter = '01'  # this resets regularly so its fine to use 01
+        rest = '00000000000000'
+        session_id = rand_ascii + counter + rest
+        session_id = session_id.encode('ascii')
+
         if raw_init_data and isinstance(raw_init_data, (bytes, bytearray)):
             # used for NF key exchange, where they don't provide a valid PSSH
             init_data = raw_init_data
@@ -53,7 +60,8 @@ class Cdm:
             self.raw_pssh = False
 
         if init_data:
-            new_session = Session(session_id, init_data, device, offline)
+            new_session = Session(session_id, init_data,
+                                  device_client_id, device_private_key, offline)
         else:
             self.logger.error("unable to parse init data")
             return 1
@@ -147,7 +155,7 @@ class Cdm:
             self.logger.error("session ID does not exist")
             return 1
 
-        session = self.sessions[session_id]
+        session: Session = self.sessions[session_id]
 
         # raw pssh will be treated as bytes and not parsed
         if self.raw_pssh:
@@ -156,16 +164,16 @@ class Cdm:
             license_request = wv_proto2.SignedLicenseRequest()
         client_id = wv_proto2.ClientIdentification()
 
-        if not os.path.exists(session.device_config.device_client_id_blob_filename):
-            self.logger.error("no client ID blob available for this device")
-            return 1
+        # if not os.path.exists(session.device_config.device_client_id_blob_filename):
+        #     self.logger.error("no client ID blob available for this device")
+        #     return 1
 
-        with open(session.device_config.device_client_id_blob_filename, "rb") as f:
-            try:
-                cid_bytes = client_id.ParseFromString(f.read())
-            except DecodeError:
-                self.logger.error("client id failed to parse as protobuf")
-                return 1
+        # with open(session.device_config.device_client_id_blob_filename, "rb") as f:
+        try:
+            cid_bytes = client_id.ParseFromString(session.device_client_id)
+        except DecodeError:
+            self.logger.error("client id failed to parse as protobuf")
+            return 1
 
         self.logger.debug("building license request")
         if not self.raw_pssh:
@@ -189,63 +197,17 @@ class Cdm:
         license_request.Msg.RequestTime = int(time.time())
         license_request.Msg.ProtocolVersion = wv_proto2.ProtocolVersion.Value(
             'CURRENT')
-        if session.device_config.send_key_control_nonce:
-            license_request.Msg.KeyControlNonce = random.randrange(1, 2**31)
+        # if session.device_config.send_key_control_nonce:
+        #     license_request.Msg.KeyControlNonce = random.randrange(1, 2**31)
 
-        if session.privacy_mode:
-            if session.device_config.vmp:
-                self.logger.debug("vmp required, adding to client_id")
-                self.logger.debug("reading vmp hashes")
-                vmp_hashes = wv_proto2.FileHashes()
-                with open(session.device_config.device_vmp_blob_filename, "rb") as f:
-                    try:
-                        vmp_bytes = vmp_hashes.ParseFromString(f.read())
-                    except DecodeError:
-                        self.logger.error(
-                            "vmp hashes failed to parse as protobuf")
-                        return 1
-                client_id._FileHashes.CopyFrom(vmp_hashes)
-            self.logger.debug(
-                "privacy mode & service certificate loaded, encrypting client id")
-            self.logger.debug("unencrypted client id:")
-            for line in text_format.MessageToString(client_id).splitlines():
-                self.logger.debug(line)
-            cid_aes_key = get_random_bytes(16)
-            cid_iv = get_random_bytes(16)
+        license_request.Msg.ClientId.CopyFrom(client_id)
 
-            cid_cipher = AES.new(cid_aes_key, AES.MODE_CBC, cid_iv)
-
-            encrypted_client_id = cid_cipher.encrypt(
-                Padding.pad(client_id.SerializeToString(), 16))
-
-            service_public_key = RSA.importKey(
-                session.service_certificate._DeviceCertificate.PublicKey)
-
-            service_cipher = PKCS1_OAEP.new(service_public_key)
-
-            encrypted_cid_key = service_cipher.encrypt(cid_aes_key)
-
-            encrypted_client_id_proto = wv_proto2.EncryptedClientIdentification()
-
-            encrypted_client_id_proto.ServiceId = session.service_certificate._DeviceCertificate.ServiceId
-            encrypted_client_id_proto.ServiceCertificateSerialNumber = session.service_certificate._DeviceCertificate.SerialNumber
-            encrypted_client_id_proto.EncryptedClientId = encrypted_client_id
-            encrypted_client_id_proto.EncryptedClientIdIv = cid_iv
-            encrypted_client_id_proto.EncryptedPrivacyKey = encrypted_cid_key
-
-            license_request.Msg.EncryptedClientId.CopyFrom(
-                encrypted_client_id_proto)
-        else:
-            license_request.Msg.ClientId.CopyFrom(client_id)
-
-        if session.device_config.private_key_available:
+        if session.device_key:
             key = RSA.importKey(
-                open(session.device_config.device_private_key_filename).read())
-            session.device_key = key
+                session.device_key)
         else:
-            self.logger.error(
-                "need device private key, other methods unimplemented")
-            return 1
+            raise Exception(
+                "No device key")
 
         self.logger.debug("signing license request")
 
