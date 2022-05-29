@@ -70,7 +70,7 @@ async def on_ready():
     blob='Device Client ID Blob',
     private="Whether the information should be shown to only you or to everyone (default is just you)",
 )
-async def deivce_info(interaction: discord.Interaction, blob: discord.Attachment, private: bool = True):
+async def device_info(interaction: discord.Interaction, blob: discord.Attachment, private: bool = True):
     await interaction.response.defer(ephemeral=private, thinking=True)
 
     if blob.size > 4000:
@@ -124,7 +124,23 @@ async def check_device(interaction: discord.Interaction, device_client_id_blob: 
             if dt_resp_code:
                 res = "{} ({})".format(dt_resp_code, DT_CODES.get(
                     int(dt_resp_code), "Unknown Error"))
-            return await interaction.followup.send(content=res, ephemeral=private)
+            try:
+                client_id = wv_proto2_pb2.ClientIdentification()
+                client_id.ParseFromString(device_client_id_bytes)
+                tree = Tree()
+                tree.create_node("**__Device Information__**", "root")
+                client_info = client_id.ClientInfo
+                for info in client_info:
+                    tree.create_node(f"**{info.Name}**: {info.Value}",
+                                     info.Name, parent="root")
+
+                tree.create_node("**Error getting license**: {}".format(
+                    res), "error", parent="root")
+
+                response_text = tree.show(stdout=False)
+                return await interaction.followup.send(content=response_text, ephemeral=private)
+            except Exception as e:
+                return await interaction.followup.send(content=f"Failed to parse id blob: {e}", ephemeral=private)
 
         data = response.json()
         (make, model, level, whitelist_status, platform, device_state, max_hdcp, client_info, platform_verification, sys_id, crypto_version, soc, client_capabilities) = (
