@@ -58,7 +58,7 @@ async def check(interaction: discord.Interaction, blob: discord.Attachment, priv
         return
 
     try:
-        data = blob.read()
+        data = await blob.read()
         client_id = wv_proto2_pb2.ClientIdentification()
         client_id.ParseFromString(data)
         tree = Tree()
