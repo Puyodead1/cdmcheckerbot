@@ -134,10 +134,9 @@ async def check_device(interaction: discord.Interaction, device_client_id_blob: 
                     tree.create_node(f"**{info.Name}**: {info.Value}",
                                      info.Name, parent="root")
 
-                tree.create_node("**Error getting license**: {}".format(
-                    res), "error", parent="root")
-
                 response_text = tree.show(stdout=False)
+                response_text += "\n\n**Error getting license**: {}".format(
+                    res)
                 return await interaction.followup.send(content=response_text, ephemeral=private)
             except Exception as e:
                 return await interaction.followup.send(content=f"Failed to parse id blob: {e}", ephemeral=private)
